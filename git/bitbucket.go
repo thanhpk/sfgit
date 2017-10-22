@@ -56,8 +56,7 @@ func (m Bb) PullRepo(repo string) error {
 }
 
 func (m Bb) CloneRepo(repo string) error {
-	cmd := shell.Commandf("git clone %s %s", m.username + "@bitbucket.org:"+ repo + ".git", m.root + repo)
-	println(fmt.Sprintf("git clone %s %s", m.username + "@bitbucket.org:"+ repo + ".git", m.root + repo))
+	cmd := shell.Commandf("git clone https://%s:%s@bitbucket.org/%s.git %s", m.username, m.password, repo, m.root + repo)
 	err :=  cmd.Run()
 	o, _ := cmd.Output()
 	fmt.Println(string(o))
