@@ -22,10 +22,31 @@ func sendHTTPRequest(method, url string, auth ...string) string {
 			base64.StdEncoding.EncodeToString([]byte(auth[0] + ":" + auth[1])))
 	}
 	res := fasthttp.AcquireResponse()
-
 	err := client.DoTimeout(req, res, 4 * time.Second)
 	if err != nil {
 		fmt.Println(err)
+		return err.Error()
+	}
+
+	// just redirect once
+	statusCode := res.Header.StatusCode()
+	if statusCode != fasthttp.StatusMovedPermanently &&
+		statusCode != fasthttp.StatusFound &&
+		statusCode != fasthttp.StatusSeeOther {
+		return string(res.Body())
+	}
+
+	location := string(res.Header.Peek("Location"))
+	if len(location) == 0 {
+		return "missing location"
+	}
+
+	req.SetRequestURI(location)
+	res = fasthttp.AcquireResponse()
+	err = client.DoTimeout(req, res, 4 * time.Second)
+	if err != nil {
+		fmt.Println(err)
+		return err.Error()
 	}
 	return string(res.Body())
 }
