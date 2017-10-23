@@ -3,12 +3,12 @@ package git
 import (
 	"github.com/tidwall/gjson"
 	"time"
-	"fmt"
+	"github.com/thanhpk/log"
 	"github.com/keegancsmith/shell"
 )
 
 type Gh struct {
-	root string
+	root, email, password string
 }
 
 const (
@@ -16,9 +16,11 @@ const (
 	ghapihost =  "https://api.github.com/repos/"
 )
 
-func NewGithubAPI(root string) *Gh {
+func NewGithubAPI(root, email, password string) *Gh {
 	return &Gh{
 		root: root,
+		email: email,
+		password: password,
 	}
 }
 
@@ -27,11 +29,11 @@ func (m Gh) GetService() string {
 }
 
 func (m Gh) LastUpdate(repo string) time.Time {
-	data := sendHTTPRequest("GET", ghapihost + repo)
+	data := sendHTTPRequest("GET", ghapihost + repo, m.email, m.password)
 	pushed := gjson.Get(data, "pushed_at")
 	t, err := time.Parse(time.RFC3339Nano, pushed.Str)
 	if err != nil {
-		fmt.Println("dd", err)
+		log.Log(data, err)
 		return time.Time{}
 	}
 	return t
@@ -44,5 +46,9 @@ func (m Gh) PullRepo(repo string) error {
 
 func (m Gh) CloneRepo(repo string) error {
 	cmd := shell.Commandf("git clone %s %s", ghhost + repo, m.root + repo)
-	return cmd.Run()
+	out, err := cmd.Output()
+	if err != nil {
+		log.Log(out)
+	}
+	return err
 }

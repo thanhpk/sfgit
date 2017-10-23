@@ -1,12 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 	"net/http/httputil"
 	"net/url"
+	"github.com/thanhpk/log"
 	"github.com/thanhpk/sfgit/db"
 	"github.com/thanhpk/sfgit/git"
 	"github.com/jinzhu/configor"
@@ -46,7 +46,7 @@ func updateIfOutdated(db DB, api API, service, repo string) {
 	}
 	err := api.PullRepo(repo)
 	if err != nil {
-		fmt.Println(err)
+		log.WithStack(err)
 	}
 	db.Touch(service, repo)
 }
@@ -68,7 +68,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reurl, _ = url.Parse("http://127.0.0.1:" + Config.GitPort + "/" + api.GetService() + "/")
-
+	log.Log(r.Host + r.RequestURI)
 
 	if r.Method == "GET" {
 		repo := extractRepo(r.URL.Path)
@@ -77,7 +77,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			err := api.CloneRepo(repo)
 			if err != nil {
-				fmt.Println(err)
+				log.Log(api.GetService())
+				log.WithStack(err, api.GetService())
 			}
 		}
 	}
@@ -91,6 +92,9 @@ var Config = struct {
 	Bitbucket struct {
 		Email, Password string
 	}
+	Github struct {
+		Email, Password string
+	}
 	ListenPort string `default:"10292"` // if this change, git.conf should change too
 	GitPort string `default:"12085"` // if this change, git.conf should change too
 }{}
@@ -100,10 +104,10 @@ func main() {
 	store = db.NewLocalDB(Config.Root, Config.Database)
 	defer store.Close()
 
-	github = git.NewGithubAPI(Config.Root + "github.com/")
+	github = git.NewGithubAPI(Config.Root + "github.com/", Config.Github.Email, Config.Github.Password)
 	bitbucket = git.NewBitbucketAPI(Config.Root + "bitbucket.org/", Config.Bitbucket.Email, Config.Bitbucket.Password)
 
 	http.HandleFunc("/", handler)
-	fmt.Println("server is running at port " + Config.ListenPort)
+	log.Log("server is running at port " + Config.ListenPort)
 	http.ListenAndServe(":" + Config.ListenPort, nil)
 }
