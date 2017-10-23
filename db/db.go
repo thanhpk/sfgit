@@ -18,7 +18,7 @@ func NewLocalDB(root, database string) *LocalDB {
 	d.database = []byte(database)
 
 	var err error
-	d.db, err = bolt.Open("git.db", 0600, nil)
+	d.db, err = bolt.Open(root + "git.db", 0600, nil)
 	if err != nil {
 		panic(err)
 	}
