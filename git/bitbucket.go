@@ -3,7 +3,7 @@ package git
 import (
 	"github.com/tidwall/gjson"
 	"time"
-	"fmt"
+	"github.com/thanhpk/log"
 	"github.com/keegancsmith/shell"
 )
 
@@ -44,7 +44,7 @@ func (m Bb) LastUpdate(repo string) time.Time {
 	pushed := gjson.Get(data, "updated_on")
 	t, err := time.Parse(time.RFC3339Nano, pushed.Str)
 	if err != nil {
-		fmt.Println("dddddddD", err)
+		log.Log(err)
 		return time.Time{}
 	}
 	return t
@@ -56,10 +56,14 @@ func (m Bb) PullRepo(repo string) error {
 }
 
 func (m Bb) CloneRepo(repo string) error {
-	cmd := shell.Commandf("git clone https://%s:%s@bitbucket.org/%s.git %s", m.username, m.password, repo, m.root + repo)
-	err :=  cmd.Run()
-	o, _ := cmd.Output()
-	fmt.Println(string(o))
 
+	cmd := shell.Commandf("git clone https://%s:%s@bitbucket.org/%s.git %s", m.username, m.password, repo, m.root + repo)
+	out, err :=  cmd.Output()
+	if err != nil {
+		log.Logf("git clone https://%s:%s@bitbucket.org/%s.git %s", m.username, m.password, repo, m.root + repo)
+
+		log.Log(string(out))
+	}
+//	o, _ := cmd.Output()
 	return err
 }
