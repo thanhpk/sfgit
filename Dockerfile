@@ -8,6 +8,10 @@ RUN apk --update add git openssh fcgiwrap spawn-fcgi && \
     rm -rf /var/lib/apt/lists/* && \
     rm /var/cache/apk/*
 
+RUN mkdir ~/.ssh
+RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
+RUN ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
+
 COPY git.conf /etc/nginx/conf.d/
 RUN mkdir /app
 RUN mkdir /srv/git
