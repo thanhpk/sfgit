@@ -51,12 +51,11 @@ func (m Bb) LastUpdate(repo string) time.Time {
 }
 
 func (m Bb) PullRepo(repo string) error {
-	cmd := shell.Commandf("cd %s && for remote in `git branch -r `; do git branch --track $remote; done || git remote update && git pull --all", m.root + repo)
+	cmd := shell.Commandf("cd %s && for i in $(git branch -r | grep  -v HEAD | sed -e 's/origin\\///'); do git checkout $i && git pull origin $i; done", m.root + repo)
 	return cmd.Run()
 }
 
 func (m Bb) CloneRepo(repo string) error {
-
 	cmd := shell.Commandf("git clone https://%s:%s@bitbucket.org/%s.git %s", m.username, m.password, repo, m.root + repo)
 	out, err :=  cmd.Output()
 	if err != nil {
