@@ -51,7 +51,7 @@ func (m Bb) LastUpdate(repo string) time.Time {
 }
 
 func (m Bb) PullRepo(repo string) error {
-	cmd := shell.Commandf("cd %s && for i in $(git branch -r | grep  -v HEAD | sed -e 's/origin\\///'); do git checkout $i && git pull origin $i; done", m.root + repo)
+	cmd := shell.Commandf("cd %s && git fetch --all && for i in $(git branch -r | grep  -v HEAD | sed -e 's/origin\\///'); do git reset --hard origin/$i; done", m.root + repo)
 	return cmd.Run()
 }
 
