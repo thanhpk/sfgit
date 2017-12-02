@@ -3,15 +3,15 @@ package git
 import (
 	"github.com/valyala/fasthttp"
 	"time"
-	"fmt"
 	"encoding/base64"
+	"errors"
 )
 
 var client = &fasthttp.Client{
 	MaxConnsPerHost: 1000,
 }
 
-func sendHTTPRequest(method, url string, auth ...string) string {
+func sendHTTPRequest(method, url string, auth ...string) (string, error) {
 	//now := time.Now().Unix()
 	req := fasthttp.AcquireRequest()
 	req.SetRequestURI(url)
@@ -24,8 +24,7 @@ func sendHTTPRequest(method, url string, auth ...string) string {
 	res := fasthttp.AcquireResponse()
 	err := client.DoTimeout(req, res, 4 * time.Second)
 	if err != nil {
-		fmt.Println(err)
-		return err.Error()
+		return "", err
 	}
 
 	// just redirect once
@@ -33,20 +32,19 @@ func sendHTTPRequest(method, url string, auth ...string) string {
 	if statusCode != fasthttp.StatusMovedPermanently &&
 		statusCode != fasthttp.StatusFound &&
 		statusCode != fasthttp.StatusSeeOther {
-		return string(res.Body())
+		return string(res.Body()), nil
 	}
 
 	location := string(res.Header.Peek("Location"))
 	if len(location) == 0 {
-		return "missing location"
+		return "", errors.New("missing location")
 	}
 
 	req.SetRequestURI(location)
 	res = fasthttp.AcquireResponse()
 	err = client.DoTimeout(req, res, 4 * time.Second)
 	if err != nil {
-		fmt.Println(err)
-		return err.Error()
+		return "", err
 	}
-	return string(res.Body())
+	return string(res.Body()), nil
 }

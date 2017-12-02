@@ -5,6 +5,7 @@ import (
 	"time"
 	"github.com/thanhpk/log"
 	"github.com/keegancsmith/shell"
+	"os"
 )
 
 type Gh struct {
@@ -29,11 +30,29 @@ func (m Gh) GetService() string {
 }
 
 func (m Gh) LastUpdate(repo string) time.Time {
-	data := sendHTTPRequest("GET", ghapihost + repo, m.email, m.password)
+	// skip existed repo
+	_, err := os.Stat(m.root + "/" +  repo + "/.git")
+	if err == nil {
+		return time.Time{}
+	}
+	var data string
+	for i := 0; i < 3; i++ {
+		data, err = sendHTTPRequest("GET", ghapihost + repo, m.email, m.password)
+		if err != nil {
+			break
+		}
+		time.Sleep(time.Duration(i + 1) * time.Second)
+	}
+	if err != nil {
+		log.Log(err)
+		return time.Time{}
+	}
+
 	pushed := gjson.Get(data, "pushed_at")
 	t, err := time.Parse(time.RFC3339Nano, pushed.Str)
 	if err != nil {
-		log.Log(data, err)
+		log.Log(data)
+		log.Log(repo, err)
 		return time.Time{}
 	}
 	return t

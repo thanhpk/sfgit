@@ -21,7 +21,10 @@ func NewBitbucketAPI(root, email, password string) *Bb {
 		panic("username and password must not be empty")
 	}
 
-	data := sendHTTPRequest("GET", bbapihost + "user", email, password)
+	data, err := sendHTTPRequest("GET", bbapihost + "user", email, password)
+	if err != nil {
+		panic(err)
+	}
 	username := gjson.Get(data, "username").Str
 	if username == "" {
 		panic("invalid email and password, cannot get username")
@@ -40,7 +43,20 @@ func (m Bb) GetService() string {
 }
 
 func (m Bb) LastUpdate(repo string) time.Time {
-	data := sendHTTPRequest("GET", bbapihost + "repositories/" + repo, m.email, m.password)
+	var data string
+	var err error
+	for i := 0; i < 3; i++ {
+		data, err = sendHTTPRequest("GET", bbapihost + "repositories/" + repo, m.email, m.password)
+		if err != nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Log(err)
+		return time.Time{}
+	}
+
 	pushed := gjson.Get(data, "updated_on")
 	t, err := time.Parse(time.RFC3339Nano, pushed.Str)
 	if err != nil {
