@@ -1,16 +1,4 @@
-FROM nginx:1.13.5-alpine
-
-LABEL maintainer="NGINX Docker Maintainers <docker-maint@nginx.com>"
-
-# install git
-
-RUN apk --update add git openssh fcgiwrap spawn-fcgi && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm /var/cache/apk/*
-
-RUN mkdir ~/.ssh
-RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
-RUN ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
+FROM thanhpk/alpine-nginx-git:1.0.0
 
 COPY git.conf /etc/nginx/conf.d/
 RUN mkdir /app
