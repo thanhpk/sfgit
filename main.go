@@ -10,6 +10,7 @@ import (
 	"github.com/thanhpk/sfgit/db"
 	"github.com/thanhpk/sfgit/git"
 	"github.com/jinzhu/configor"
+	"github.com/thanhpk/goslice"
 )
 
 type DB interface {
@@ -30,6 +31,35 @@ type API interface {
 var store DB
 var github API
 var bitbucket API
+var origincf API
+
+var pullingrepo = make([]string, 0)
+var cloningrepo = make([]string, 0)
+
+func printStatus() {
+	log.Logf("cloning %d repos %v\npulling %d repos %v", len(cloningrepo), cloningrepo,
+		len(pullingrepo), pullingrepo)
+}
+
+func addPullingRepo(repo string) {
+	pullingrepo = append(pullingrepo, repo)
+	printStatus()
+}
+
+func removePullingRepo(repo string) {
+	pullingrepo = slice.Substract(pullingrepo, []string{repo})
+	printStatus()
+}
+
+func addCloningRepo(repo string) {
+	cloningrepo = append(cloningrepo, repo)
+	printStatus()
+}
+
+func removeCloningRepo(repo string) {
+	cloningrepo = slice.Substract(cloningrepo, []string{repo})
+	printStatus()
+}
 
 func shouldUpdate(db DB, api API, service, repo string) bool {
 	t := api.LastUpdate(repo)
@@ -44,7 +74,10 @@ func updateIfOutdated(db DB, api API, service, repo string) {
 	if !shouldUpdate(db, api, service, repo) {
 		return
 	}
+	addPullingRepo(repo)
 	err := api.PullRepo(repo)
+	removePullingRepo(repo)
+
 	if err != nil {
 		log.WithStack(err)
 	}
@@ -53,7 +86,11 @@ func updateIfOutdated(db DB, api API, service, repo string) {
 
 func extractRepo(url string) string {
 	repo := strings.Split(url, "/info/")[0]
-	return repo[1:]
+	repo = repo[1:]
+	if strings.HasSuffix(repo, ".git") {
+		repo = repo[:len(repo)-4]
+	}
+	return repo
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -63,25 +100,36 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		api = github
 	} else if strings.Contains(r.Host, "bitbucket") {
 		api = bitbucket
+	} else if strings.Contains(r.Host, "origin") {
+		api = origincf
 	} else {
 		http.Error(w, "unsupported service " + r.Host, 400)
 		return
 	}
 	reurl, _ = url.Parse("http://127.0.0.1:" + Config.GitPort + "/" + api.GetService() + "/")
-	log.Log(r.Host + r.RequestURI)
+	repo := extractRepo(r.URL.Path)
+	log.Log(r.Host + "/" + repo)
 
 	if r.Method == "GET" {
-		repo := extractRepo(r.URL.Path)
 		if store.IsRepoExists(api.GetService(), repo) {
 			updateIfOutdated(store, api, api.GetService(), repo)
 		} else {
+			addCloningRepo(repo)
 			err := api.CloneRepo(repo)
 			if err != nil {
 				log.Log(api.GetService())
 				log.WithStack(err, api.GetService())
 			}
+			removeCloningRepo(repo)
 		}
 	}
+	ps := strings.Split(r.URL.Path, "/")
+	if len(ps) > 3 && (ps[3] == "info" || ps[3] == "git-upload-pack") {
+		ps[2] = strings.Split(ps[2], ".git")[0]
+		r.URL.Path = strings.Join(ps, "/")
+	}
+	log.Log(r.URL, r.URL.Path)
+
 	reverseproxy := httputil.NewSingleHostReverseProxy(reurl)
 	reverseproxy.ServeHTTP(w, r)
 }
@@ -95,6 +143,9 @@ var Config = struct {
 	Github struct {
 		Email, Password string
 	}
+	Origincf struct {
+		Username, Password string
+	}
 	ListenPort string `default:"10292"` // if this change, git.conf should change too
 	GitPort string `default:"12085"` // if this change, git.conf should change too
 }{}
@@ -106,6 +157,8 @@ func main() {
 
 	github = git.NewGithubAPI(Config.Root + "github.com/", Config.Github.Email, Config.Github.Password)
 	bitbucket = git.NewBitbucketAPI(Config.Root + "bitbucket.org/", Config.Bitbucket.Email, Config.Bitbucket.Password)
+
+	origincf = git.NewOriginCfAPI(Config.Root + "origin.cf/", Config.Origincf.Username, Config.Origincf.Password)
 
 	http.HandleFunc("/", handler)
 	log.Log("server is running at port " + Config.ListenPort)
