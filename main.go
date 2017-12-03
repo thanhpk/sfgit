@@ -11,7 +11,6 @@ import (
 	"github.com/thanhpk/sfgit/git"
 	"github.com/jinzhu/configor"
 	"github.com/thanhpk/goslice"
-//	"fmt"
 )
 
 type DB interface {
@@ -40,7 +39,8 @@ var pullingrepo = make([]string, 0)
 var cloningrepo = make([]string, 0)
 
 func printStatus() {
-	log.Logf("cloning %d repos %v\npulling %d repos %v", len(cloningrepo), cloningrepo,
+	log.Logf("cloning %d repos %v\npulling %d repos %v",
+		len(cloningrepo), cloningrepo,
 		len(pullingrepo), pullingrepo)
 }
 
@@ -103,7 +103,9 @@ func reverseProxy(w http.ResponseWriter, r *http.Request, u *url.URL, username, 
 	r.URL.User = u.User
 	r.Host = u.Host
 	r.RequestURI = r.URL.String()
-	r.SetBasicAuth(username, password)
+	if username != "" {
+		r.SetBasicAuth(username, password)
+	}
 	reverseproxy.ServeHTTP(w, r)
 }
 
@@ -120,19 +122,36 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unsupported service " + r.Host, 400)
 		return
 	}
+	u, p := api.GetAuth()
 	reurl, _ = url.Parse("http://127.0.0.1:" + Config.GitPort + "/" + api.GetService() + "/")
 	repo := extractRepo(r.URL.Path)
-	log.Log(r.Host + "/" + repo)
+	log.Log(r.Method, r.Host + "/" + repo, r.URL.String())
+
+	ps := strings.Split(r.URL.String(), "/")
+	if r.Method == "GET" && len(ps) > 4 && ps[4] == "refs?service=git-receive-pack" {
+		reurl, _ = url.Parse(api.GetAuthUrl())
+		reverseProxy(w, r, reurl, u, p)
+		return
+	}
+
+	if r.Method == "POST" && len(ps) > 4 && ps[4] == "refs?service=git-upload-pack" {
+		// add .git to path
+		ps[2] = strings.Split(ps[2], ".git")[0]
+		r.URL.Path = strings.Join(ps, "/")
+
+		reurl, _ = url.Parse(api.GetAuthUrl())
+		reverseProxy(w, r, reurl, u, p)
+		return
+	}
+
+	// Push to remote
+	if r.Method == "POST" && len(ps) > 3 && ps[len(ps) -1] == "git-receive-pack" {
+		reurl, _ = url.Parse(api.GetAuthUrl())
+		reverseProxy(w, r, reurl, u, p)
+		return
+	}
 
 	if r.Method == "GET" {
-		ps := strings.Split(r.URL.String(), "/")
-		if len(ps) > 4 && ps[4] == "refs?service=git-receive-pack" {
-			reurl, _ = url.Parse(api.GetAuthUrl())
-			u, p := api.GetAuth()
-			reverseProxy(w, r, reurl, u, p)
-			return
-		}
-
 		if store.IsRepoExists(api.GetService(), repo) {
 			updateIfOutdated(store, api, api.GetService(), repo)
 		} else {
@@ -144,19 +163,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			}
 			removeCloningRepo(repo)
 		}
-	} else if r.Method == "POST" {
-		ps := strings.Split(r.URL.String(), "/")
-		log.Log(r.Method, r.URL, r.URL.Path)
-		if len(ps) > 4 && ps[4] == "refs?service=git-upload-pack" {
-			ps[2] = strings.Split(ps[2], ".git")[0]
-			r.URL.Path = strings.Join(ps, "/")
-		}
 	}
-
-	reurl, _ = url.Parse(api.GetAuthUrl())
-	u, p := api.GetAuth()
-	reverseProxy(w, r, reurl, u, p)
-	return
+	reverseProxy(w, r, reurl, "", "")
 }
 
 var Config = struct {
@@ -179,11 +187,21 @@ func main() {
 	configor.Load(&Config, "./config.yaml")
 	store = db.NewLocalDB(Config.Root, Config.Database)
 	defer store.Close()
+	c := make(chan bool, 3)
+	go func() {
+		github = git.NewGithubAPI(Config.Root + "github.com/", Config.Github.Email, Config.Github.Password)
+		c <- true
+	}()
+	go func() {
+		bitbucket = git.NewBitbucketAPI(Config.Root + "bitbucket.org/", Config.Bitbucket.Email, Config.Bitbucket.Password)
+		c <- true
+	}()
 
-	github = git.NewGithubAPI(Config.Root + "github.com/", Config.Github.Email, Config.Github.Password)
-	bitbucket = git.NewBitbucketAPI(Config.Root + "bitbucket.org/", Config.Bitbucket.Email, Config.Bitbucket.Password)
-
-	origincf = git.NewOriginCfAPI(Config.Root + "origin.cf/", Config.Origincf.Username, Config.Origincf.Password)
+	go func() {
+		origincf = git.NewOriginCfAPI(Config.Root + "origin.cf/", Config.Origincf.Username, Config.Origincf.Password)
+		c <- true
+	}()
+	_, _, _ = <-c, <-c, <-c
 
 	http.HandleFunc("/", handler)
 	log.Log("server is running at port " + Config.ListenPort)
