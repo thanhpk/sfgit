@@ -11,6 +11,7 @@ import (
 	"github.com/thanhpk/sfgit/git"
 	"github.com/jinzhu/configor"
 	"github.com/thanhpk/goslice"
+//	"fmt"
 )
 
 type DB interface {
@@ -26,6 +27,8 @@ type API interface {
 	//ShouldUpdate(repo string) bool
 	PullRepo(repo string) error
 	CloneRepo(repo string) error
+	GetAuth() (string, string)
+	GetAuthUrl() string
 }
 
 var store DB
@@ -93,6 +96,17 @@ func extractRepo(url string) string {
 	return repo
 }
 
+func reverseProxy(w http.ResponseWriter, r *http.Request, u *url.URL, username, password string) {
+	reverseproxy := httputil.NewSingleHostReverseProxy(u)
+	r.URL.Scheme="https"
+	r.URL.Host = u.Host
+	r.URL.User = u.User
+	r.Host = u.Host
+	r.RequestURI = r.URL.String()
+	r.SetBasicAuth(username, password)
+	reverseproxy.ServeHTTP(w, r)
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
 	var api API
 	var reurl *url.URL
@@ -111,6 +125,14 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	log.Log(r.Host + "/" + repo)
 
 	if r.Method == "GET" {
+		ps := strings.Split(r.URL.String(), "/")
+		if len(ps) > 4 && ps[4] == "refs?service=git-receive-pack" {
+			reurl, _ = url.Parse(api.GetAuthUrl())
+			u, p := api.GetAuth()
+			reverseProxy(w, r, reurl, u, p)
+			return
+		}
+
 		if store.IsRepoExists(api.GetService(), repo) {
 			updateIfOutdated(store, api, api.GetService(), repo)
 		} else {
@@ -122,16 +144,19 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			}
 			removeCloningRepo(repo)
 		}
+	} else if r.Method == "POST" {
+		ps := strings.Split(r.URL.String(), "/")
+		log.Log(r.Method, r.URL, r.URL.Path)
+		if len(ps) > 4 && ps[4] == "refs?service=git-upload-pack" {
+			ps[2] = strings.Split(ps[2], ".git")[0]
+			r.URL.Path = strings.Join(ps, "/")
+		}
 	}
-	ps := strings.Split(r.URL.Path, "/")
-	if len(ps) > 3 && (ps[3] == "info" || ps[3] == "git-upload-pack") {
-		ps[2] = strings.Split(ps[2], ".git")[0]
-		r.URL.Path = strings.Join(ps, "/")
-	}
-	log.Log(r.URL, r.URL.Path)
 
-	reverseproxy := httputil.NewSingleHostReverseProxy(reurl)
-	reverseproxy.ServeHTTP(w, r)
+	reurl, _ = url.Parse(api.GetAuthUrl())
+	u, p := api.GetAuth()
+	reverseProxy(w, r, reurl, u, p)
+	return
 }
 
 var Config = struct {

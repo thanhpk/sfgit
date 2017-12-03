@@ -62,6 +62,12 @@
   version = "v0.0.3"
 
 [[projects]]
+  name = "github.com/thanhpk/goslice"
+  packages = ["."]
+  revision = "334b985c3c7768fc0c6b15c9b5f73ff47ca8a6a7"
+  version = "v1.0.0"
+
+[[projects]]
   name = "github.com/thanhpk/log"
   packages = ["."]
   revision = "bb5792c6f0b60b482d7309ea2c325ef2c0f8e826"
@@ -70,8 +76,8 @@
 [[projects]]
   name = "github.com/tidwall/gjson"
   packages = ["."]
-  revision = "5a69e67cfd8f6f9b0044ed49f5079d0eeed28653"
-  version = "v1.0.1"
+  revision = "182ad7605048a24cd37115b7157b8a4436d9ea17"
+  version = "v1.0.3"
 
 [[projects]]
   branch = "master"
@@ -89,17 +95,17 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "46eaec7899b1dd945c25db17c78ba3f0c58a6613"
+  revision = "8b4580aae2a0dd0c231a45d3ccb8434ff533b840"
 
 [[projects]]
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "eb3733d160e74a9c7e442f435eb3bea458e1d19f"
+  revision = "287cf08546ab5e7e37d55a84f7ed3fd1db036de5"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "71fecef54dc0b719fbacd76f874061e4274bd53f6fa05e4bd2ec16c061a4f10b"
+  inputs-digest = "3784acb564b8dd4683b15d2348361bc92276af7cb9b4edb7eb40e043b91757df"
   solver-name = "gps-cdcl"
   solver-version = 1
