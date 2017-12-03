@@ -5,10 +5,11 @@ import (
 	"time"
 	"github.com/thanhpk/log"
 	"github.com/keegancsmith/shell"
+	"fmt"
 )
 
 type OriginCf struct {
-	root, email, password string
+	root, username, email, password string
 }
 
 const (
@@ -68,4 +69,12 @@ func (m OriginCf) CloneRepo(repo string) error {
 	}
 //	o, _ := cmd.Output()
 	return err
+}
+
+func (m OriginCf) GetAuthUrl() string {
+	return fmt.Sprintf("https://%s:%s@origin.cf", m.username, m.password)
+}
+
+func (m OriginCf) GetAuth() (string, string) {
+	return m.username, m.password
 }

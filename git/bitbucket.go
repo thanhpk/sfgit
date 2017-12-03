@@ -5,6 +5,7 @@ import (
 	"time"
 	"github.com/thanhpk/log"
 	"github.com/keegancsmith/shell"
+	"fmt"
 )
 
 type Bb struct {
@@ -27,7 +28,7 @@ func NewBitbucketAPI(root, email, password string) *Bb {
 	}
 	username := gjson.Get(data, "username").Str
 	if username == "" {
-		panic("invalid email and password, cannot get username")
+		panic("invalid email and password, cannot get bitbucket username")
 	}
 
 	return &Bb{
@@ -72,13 +73,21 @@ func (m Bb) PullRepo(repo string) error {
 }
 
 func (m Bb) CloneRepo(repo string) error {
-	cmd := shell.Commandf("git clone https://%s:%s@bitbucket.org/%s.git %s", m.username, m.password, repo, m.root + repo)
+	cmd := shell.Commandf("git clone %s/%s.git %s", m.GetAuthUrl(), repo, m.root + repo)
 	out, err :=  cmd.Output()
 	if err != nil {
-		log.Logf("git clone https://%s:%s@bitbucket.org/%s.git %s", m.username, m.password, repo, m.root + repo)
+		log.Logf("git clone %s/%s.git %s", m.GetAuthUrl(), repo, m.root + repo)
 
 		log.Log(string(out))
 	}
 //	o, _ := cmd.Output()
 	return err
+}
+
+func (m Bb) GetAuthUrl() string {
+	return fmt.Sprintf("https://%s:%s@bitbucket.org", m.username, m.password)
+}
+
+func (m Bb) GetAuth() (string, string) {
+	return m.username, m.password
 }
