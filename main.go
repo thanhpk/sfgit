@@ -88,8 +88,7 @@ func updateIfOutdated(db DB, api API, service, repo string) {
 }
 
 func extractRepo(url string) string {
-	repo := strings.Split(url, "/info/")[0]
-	repo = repo[1:]
+	repo := strings.Join(strings.Split(url, "/")[1:3], "/")
 	if strings.HasSuffix(repo, ".git") {
 		repo = repo[:len(repo)-4]
 	}
@@ -164,6 +163,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			removeCloningRepo(repo)
 		}
 	}
+	pathsplit := strings.Split(r.URL.Path, "/")
+	r.URL.Path = strings.Join(append([]string{"/" + repo}, pathsplit[3:]...), "/")
 	reverseProxy(w, r, reurl, "", "")
 }
 
